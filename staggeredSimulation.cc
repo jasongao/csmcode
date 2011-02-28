@@ -19,17 +19,17 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("TapWifiVirtualMachineExample");
 
-//static void
-//CourseChange (std::ostream *os, std::string foo, Ptr<const MobilityModel> mobility)
-//{
-//  Vector pos = mobility->GetPosition (); // Get position
-//  Vector vel = mobility->GetVelocity (); // Get velocity
-//
-//  // Prints position and velocities
-//  *os << Simulator::Now () << " POS: x=" << pos.x << ", y=" << pos.y
-//      << ", z=" << pos.z << "; VEL:" << vel.x << ", y=" << vel.y
-//      << ", z=" << vel.z << std::endl;
-//}
+static void
+CourseChange (std::ostream *os, std::string foo, Ptr<const MobilityModel> mobility)
+{
+  Vector pos = mobility->GetPosition (); // Get position
+  Vector vel = mobility->GetVelocity (); // Get velocity
+
+  // Prints position and velocities
+  *os << Simulator::Now () << " POS: x=" << pos.x << ", y=" << pos.y
+      << ", z=" << pos.z << "; VEL:" << vel.x << ", y=" << vel.y
+      << ", z=" << vel.z << std::endl;
+}
 
 // This is for ns-2 trace integration.  
 
@@ -104,7 +104,6 @@ static void InitializeNetworkedMobileNode(int nodeID) {
 //	     mobility.EnableAscii(std::cout,nodeID);
 	}
 
-	std::cout<<"Initiated mobility \n";
 	// TODO: Add the option to feed in traces from ns-2 
 
 	char tapString[10];
@@ -114,22 +113,7 @@ static void InitializeNetworkedMobileNode(int nodeID) {
 	tapBridge.Install (smartNodePointer, device.Get (0));   // devices is a container but it contains only one object in this case
 }
 
-/*
-static void startMobilityLogging(NetworkedMobileNode* mobileNode) {
-   std::cout<<"Terrain dimension is "<<terrainDimension<<std::endl;
-   randomWalkMobility.SetPositionAllocator ("ns3::GridPositionAllocator",
-    "MinX", DoubleValue (0.0),
-    "MinY", DoubleValue (0.0),
-    "DeltaX", DoubleValue (1),
-    "DeltaY", DoubleValue (1),
-    "GridWidth", UintegerValue (1),
-    "LayoutType", StringValue ("RowFirst"));
-   randomWalkMobility.SetMobilityModel ("ns3::RandomWalk2dMobilityModel","Bounds", RectangleValue (Rectangle (0, terrainDimension, 0, terrainDimension)));
-   randomWalkMobility.Install(NodeContainer::GetGlobal()); 
-   randomWalkMobility.EnableAsciiAll(std::cout);
 
-}
-*/
 
 int main (int argc, char *argv[])
 {
@@ -139,11 +123,13 @@ int main (int argc, char *argv[])
   srand(time(NULL));
   CommandLine cmd;
   cmd.Parse (argc, argv);
+  std::string traceFile; 
+ 
   int simulationTime=0;
   if(argc < 5) {
 	std::cout<<"Usage: Enter number of Nodes followed by the size of terrain followed by mobility mode "<<std::endl;
 	std::cout<<"1. Constant position, 2. Mobile based on random walk, 3. Trace driven"<<std::endl;
-	std::cout<<"Followed by simulation time "<<std::endl;
+	std::cout<<"Followed by simulation time  followed by traceFile name (in case of ns-2 trace) "<<std::endl;
 	exit(0);
   }
   else {
@@ -151,7 +137,20 @@ int main (int argc, char *argv[])
 	terrainDimension=atoi(argv[2]);
 	mobilityMode=atoi(argv[3]);
 	simulationTime=atoi(argv[4]);
+	if(mobilityMode==3) {
+	    if(argc < 6) {
+		std::cout<<"Usage: Enter number of Nodes followed by the size of terrain followed by mobility mode "<<std::endl;
+		std::cout<<"1. Constant position, 2. Mobile based on random walk, 3. Trace driven"<<std::endl;
+		std::cout<<"Followed by simulation time  followed by traceFile name (in case of ns-2 trace) "<<std::endl;
+		exit(0);
+ 	     }
+	   else {
+		traceFile=argv[5];		// traceFile for ns-2 traces. 
+	    } 
+	}
   }
+
+  // log output from ns-2 mobility trace course changes 
   std::string logFile("/home/anirudh/Desktop/ns-3-dev/examples/tap/mobility.log");
   std::ofstream os;
   os.open(logFile.c_str());
@@ -178,10 +177,18 @@ int main (int argc, char *argv[])
               "LayoutType", StringValue ("RowFirst"));
              mobility.SetMobilityModel ("ns3::RandomWalk2dMobilityModel","Bounds", RectangleValue (Rectangle (0, terrainDimension, 0, terrainDimension)));
 	     mobility.Install(nodes);
-//	     mobility.EnableAsciiAll(std::cout); God knows what is happening here? Now suddenly it all seems to work. God, help me out here. 
+	     mobility.EnableAsciiAll(std::cout);// God knows what is happening here? Now suddenly it all seems to work even without enabling the ASCII all. God, help me out here. 
+             std::cout<<"Initiated mobility \n";
+
   }
-
-
+  else  if (mobilityMode ==3) { // feed in ns-2 traces. 
+             std::cout<<"Terrain dimension is "<<terrainDimension<<std::endl;
+             Ns2MobilityHelper ns2mobility=Ns2MobilityHelper(traceFile);
+	     ns2mobility.Install(); // TODO: configure call back if required. 
+	     Config::Connect ("/NodeList/*/$ns3::MobilityModel/CourseChange",
+                   MakeBoundCallback (&CourseChange, &os));
+             std::cout<<"Initiated mobility from ns-2 trace file \n";
+  }
 
   int i=0;
   for(i=0;i<numberOfNodes;i++) {
