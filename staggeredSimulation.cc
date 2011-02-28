@@ -49,6 +49,11 @@ MobilityHelper mobility;		// ns-3's representation of the node's mobility
 int mobilityMode =-1; 
 int terrainDimension=0;
 int numberOfNodes=0;
+NodeContainer nodes;
+
+
+
+
 void InitializeNetworkComponents() {
   
   // We're going to use 802.11p data channel ,so set up a wifi helper to reflect that.
@@ -70,71 +75,45 @@ void InitializeNetworkComponents() {
 
 }
 
-class NetworkedMobileNode {
-	public:
-		Node* node;				// ns-3's representation of the node that this class represents
-		ns3::Ptr<ns3::Node> smartNodePointer;	// ns-3's smart pointer representation for the node 
-		int nodeId;				// node's ID  
-		int mobilityMode;			// mobility type
-		NodeContainer* nodeContainer;		// dummy cover for this node for the purpose of calling EnableAscii
-			
-		NetworkedMobileNode(int nodeId,int mobilityMode) { // constructor
-			     node = new Node(1);	// system ID 1 used for distributed simulation 	     
-			     this->nodeId=nodeId;
-	                     this->mobilityMode=mobilityMode;
-	                     smartNodePointer= ns3::Ptr<ns3::Node>::Ptr(node);
-			     nodeContainer= new NodeContainer(smartNodePointer);
-		}
-		
-		void InitializeNetworkedMobileNode() {
-			std::cout<<"In Initialize Node on node ID  "<<nodeId<<std::endl;
 
-			device = wifi.Install (wifiPhy, wifiMac, smartNodePointer); // connect node with phy and mac to create device
-			if(mobilityMode==1) { // constant position mobility fixed nodes
-			   // std::cout<<"Terrain side is  " << terrainDimension<<std::endl;  
-		   	     Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
-   
-			     float randomxPosition=((float)rand()/RAND_MAX)*(terrainDimension) ; // All nodes are randomly distributed in a square of side terrainDimension
-			     float randomyPosition=((float)rand()/RAND_MAX)*(terrainDimension) ; // All nodes are randomly distributed in a square of side terrainDimension
-			     positionAlloc->Add (Vector (randomxPosition,randomyPosition, 0.0));
-			 
- 			     //std::cout<<"Node : "<<i<<": Node position is x : "<< randomxPosition<<" y : "<<randomyPosition<<endl;
-			     mobility.SetPositionAllocator (positionAlloc);
-			     mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-			     mobility.Install(smartNodePointer);
-			     mobility.EnableAscii(std::cout,nodeId);
+static void InitializeNetworkedMobileNode(int nodeID) {
+	
+	std::cout<<"In Initialize Node on node ID  "<<nodeID<<std::endl;
+	Ptr<Node> smartNodePointer;
+	smartNodePointer=nodes.Get(nodeID);
 
-   		        }
-			
-			else if (mobilityMode ==2) {
+	device = wifi.Install (wifiPhy, wifiMac, smartNodePointer); // connect node with phy and mac to create device
+	if(mobilityMode==1) { // constant position mobility fixed nodes
+	   // std::cout<<"Terrain side is  " << terrainDimension<<std::endl;  
+   	     Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
 
-                             std::cout<<"Terrain dimension is "<<terrainDimension<<std::endl;
-                             mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
-                              "MinX", DoubleValue (0.0),
-                              "MinY", DoubleValue (0.0),
-                              "DeltaX", DoubleValue (1),
-                              "DeltaY", DoubleValue (1),
-                              "GridWidth", UintegerValue (1),
-                              "LayoutType", StringValue ("RowFirst"));
-                             mobility.SetMobilityModel ("ns3::RandomWalk2dMobilityModel","Bounds", RectangleValue (Rectangle (0, terrainDimension, 0, terrainDimension)));
-                             mobility.Install(smartNodePointer); 
-                             mobility.EnableAscii(std::cout,*nodeContainer);
-			}
+	     float randomxPosition=((float)rand()/RAND_MAX)*(terrainDimension) ; // All nodes are randomly distributed in a square of side terrainDimension
+	     float randomyPosition=((float)rand()/RAND_MAX)*(terrainDimension) ; // All nodes are randomly distributed in a square of side terrainDimension
+	     positionAlloc->Add (Vector (randomxPosition,randomyPosition, 0.0));
+	 
+	     //std::cout<<"Node : "<<i<<": Node position is x : "<< randomxPosition<<" y : "<<randomyPosition<<endl;
+	     mobility.SetPositionAllocator (positionAlloc);
+	     mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+	     mobility.Install(smartNodePointer);
+	     mobility.EnableAscii(std::cout,nodeID);
+        }
+	
+	else if (mobilityMode ==2) {
 
-			std::cout<<"Initiated mobility \n";
-			// TODO: Add the option to feed in traces from ns-2 
+     //        mobility.Install(smartNodePointer); 
+//	     mobility.EnableAscii(std::cout,nodeID);
+	}
 
-			char tapString[10];
-			sprintf(tapString,"tap%d",nodeId);
-			tapBridge.SetAttribute ("Mode", StringValue ("UseLocal"));
-			tapBridge.SetAttribute ("DeviceName", StringValue (tapString));
-			tapBridge.Install (smartNodePointer, device.Get (0));   // devices is a container but it contains only one object in this case
-		}
-};
+	std::cout<<"Initiated mobility \n";
+	// TODO: Add the option to feed in traces from ns-2 
 
-static void InitializeNode(NetworkedMobileNode* mobileNode){
-	mobileNode->InitializeNetworkedMobileNode();
+	char tapString[10];
+	sprintf(tapString,"tap%d",nodeID);
+	tapBridge.SetAttribute ("Mode", StringValue ("UseLocal"));
+	tapBridge.SetAttribute ("DeviceName", StringValue (tapString));
+	tapBridge.Install (smartNodePointer, device.Get (0));   // devices is a container but it contains only one object in this case
 }
+
 /*
 static void startMobilityLogging(NetworkedMobileNode* mobileNode) {
    std::cout<<"Terrain dimension is "<<terrainDimension<<std::endl;
@@ -183,22 +162,32 @@ int main (int argc, char *argv[])
   GlobalValue::Bind ("ChecksumEnabled", BooleanValue (true));
   // Install the wireless devices onto our ghost nodes.
   // TODO: Fix the UseLocal for br
+  nodes.Create (numberOfNodes);
+
   InitializeNetworkComponents();
-  NetworkedMobileNode* freshMobileNode;
+
+  if (mobilityMode ==2) {
+
+             std::cout<<"Terrain dimension is "<<terrainDimension<<std::endl;
+             mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
+              "MinX", DoubleValue (0.0),
+              "MinY", DoubleValue (0.0),
+              "DeltaX", DoubleValue (1),
+              "DeltaY", DoubleValue (1),
+              "GridWidth", UintegerValue (1),
+              "LayoutType", StringValue ("RowFirst"));
+             mobility.SetMobilityModel ("ns3::RandomWalk2dMobilityModel","Bounds", RectangleValue (Rectangle (0, terrainDimension, 0, terrainDimension)));
+	     mobility.Install(nodes);
+//	     mobility.EnableAsciiAll(std::cout); God knows what is happening here? Now suddenly it all seems to work. God, help me out here. 
+  }
+
+
+
   int i=0;
   for(i=0;i<numberOfNodes;i++) {
 //       std::cout<<"Now inserting node"<<i<<std::endl;
-         freshMobileNode=new NetworkedMobileNode(i,mobilityMode);	// create a new networked mobile node object 
-         Simulator::Schedule(Seconds(0.1*(i+1)),&InitializeNode,freshMobileNode);
+         Simulator::Schedule(Seconds((i+1)*0.5),&InitializeNetworkedMobileNode,i);
   }
-
-//  Simulator::Schedule(Seconds(0.1*(i+1)),&startMobilityLogging,freshMobileNode);
-
-//  if(mobilityMode ==2 )	 {		// random walk etc
-//     Simulator::Schedule(Seconds(0.1*(i+1)),&startMobilityLogging,freshMobileNode);
-//    }
-
-//  Simulator::Schedule(Seconds(10*(i+1)),&startMobilityLogging,freshMobileNode);
 
 
   std::cout<<"Simulating for "<<simulationTime<<" seconds "<<std::endl;
